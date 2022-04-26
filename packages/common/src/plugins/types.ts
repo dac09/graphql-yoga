@@ -4,8 +4,31 @@ import { GraphQLParams } from '../types'
 export type Plugin<
   PluginContext extends Record<string, any> = {},
   TServerContext = {},
-> = EnvelopPlugin<PluginContext> & {
-  onRequestParse?: OnRequestParseHook<TServerContext>
+  > = EnvelopPlugin<PluginContext> & {
+    onRequest?: OnRequestHook<TServerContext>
+    onRequestParse?: OnRequestParseHook<TServerContext>
+  }
+
+export type OnRequestHook<TServerContext> = (
+  payload: OnRequestEventPayload<TServerContext>,
+) => PromiseOrValue<void | OnRequestHookResult>
+
+export interface OnRequestEventPayload<TServerContext> {
+  request: Request
+  serverContext: TServerContext | undefined
+  endResponse(body: BodyInit | null, init?: ResponseInit): void
+}
+
+export interface OnRequestHookResult {
+  onRequestDone?: OnRequestDoneHook
+}
+
+export type OnRequestDoneHook = (
+  payload: OnRequestDoneEventPayload,
+) => PromiseOrValue<void>
+
+export interface OnRequestDoneEventPayload {
+  response: Response
 }
 
 export type OnRequestParseHook<TServerContext> = (

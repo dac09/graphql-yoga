@@ -2,4 +2,4 @@
 '@graphql-yoga/common': minor
 ---
 
-New Yoga-specific hooks for plugins: onRequestParse & onRequestParseDone
+New Yoga-specific hooks for plugins: onRequestParse, onRequestParseDone, onRequest & onRequestDone
