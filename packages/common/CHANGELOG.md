@@ -1,5 +1,11 @@
 # @graphql-yoga/common
 
+## 2.6.0
+
+### Minor Changes
+
+- a7834d6: New Yoga-specific hooks for plugins: onRequestParse & onRequestParseDone
+
 ## 2.5.0
 
 ### Minor Changes
