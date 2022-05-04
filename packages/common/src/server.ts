@@ -29,11 +29,6 @@ import {
   Plugin,
   RequestParser,
 } from './plugins/types'
-import {
-  GraphiQLOptions,
-  renderGraphiQL,
-  shouldRenderGraphiQL,
-} from './graphiql'
 import * as crossUndiciFetch from 'cross-undici-fetch'
 import { processRequest } from './processRequest'
 import { defaultYogaLogger, titleBold, YogaLogger } from './logger'
@@ -43,7 +38,7 @@ import { usePOSTMultipartRequestParser } from './plugins/requestParser/POSTMulti
 import { CORSPluginOptions, useCORS } from './plugins/useCORS'
 import { useHealthCheck } from './plugins/useHealthCheck'
 import {
-  GraphiQLOptionsFactory,
+  GraphiQLOptions,
   GraphiQLOptionsOrFactory,
   useGraphiQL,
 } from './plugins/useGraphiQL'
