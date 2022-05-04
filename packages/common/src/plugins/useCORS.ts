@@ -1,5 +1,16 @@
-import { CORSOptions } from '../types'
+import { PromiseOrValue } from '@envelop/core'
 import { Plugin } from './types'
+
+export type CORSOptions =
+  | {
+      origin?: string[] | string
+      methods?: string[]
+      allowedHeaders?: string[]
+      exposedHeaders?: string[]
+      credentials?: boolean
+      maxAge?: number
+    }
+  | false
 
 export type CORSPluginOptions<TServerContext> =
   | ((
@@ -14,39 +25,54 @@ export type CORSPluginOptions<TServerContext> =
 export type CORSOptionsFactory<TServerContext> = (
   request: Request,
   serverContext: TServerContext,
-) => CORSOptions
+) => PromiseOrValue<CORSOptions>
 
-function getCORSResponseHeaders<TServerContext>(
+export function getCORSHeadersByRequestAndOptions(
   request: Request,
-  serverContext: TServerContext,
-  corsOptionsFactory: CORSOptionsFactory<TServerContext>,
-) {
-  const corsOptions = corsOptionsFactory(request, serverContext)
-
-  const headers: Record<string, string> = {}
-
-  const currentOrigin = request.headers.get('origin')
-
-  headers['Access-Control-Allow-Origin'] = '*'
-
-  if (currentOrigin) {
-    const credentialsAsked = request.headers.get('cookies')
-    if (credentialsAsked) {
-      headers['Access-Control-Allow-Origin'] = currentOrigin
-    }
+  corsOptions: CORSOptions,
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    Server: 'GraphQL Yoga',
   }
 
+  if (corsOptions === false) {
+    return headers
+  }
+
+  // If defined origins have '*' or undefined by any means, we should allow all origins
   if (
-    currentOrigin != null &&
-    corsOptions.origin?.length &&
-    !corsOptions.origin.includes(currentOrigin) &&
-    !corsOptions.origin.includes('*')
+    corsOptions.origin == null ||
+    corsOptions.origin.length === 0 ||
+    corsOptions.origin.includes('*')
   ) {
-    headers['Access-Control-Allow-Origin'] = 'null'
-  }
-
-  if (headers['Access-Control-Allow-Origin'] !== '*') {
-    headers['Vary'] = 'Origin'
+    const currentOrigin = request.headers.get('origin')
+    // If origin is available in the headers, use it
+    if (currentOrigin != null) {
+      headers['Access-Control-Allow-Origin'] = currentOrigin
+      // Vary by origin because there are multiple origins
+      headers['Vary'] = 'Origin'
+    } else {
+      headers['Access-Control-Allow-Origin'] = '*'
+    }
+  } else if (typeof corsOptions.origin === 'string') {
+    // If there is one specific origin is specified, use it directly
+    headers['Access-Control-Allow-Origin'] = corsOptions.origin
+  } else if (Array.isArray(corsOptions.origin)) {
+    // If there is only one origin defined in the array, consider it as a single one
+    if (corsOptions.origin.length === 1) {
+      headers['Access-Control-Allow-Origin'] = corsOptions.origin[0]
+    } else {
+      const currentOrigin = request.headers.get('origin')
+      if (currentOrigin != null && corsOptions.origin.includes(currentOrigin)) {
+        // If origin is available in the headers, use it
+        headers['Access-Control-Allow-Origin'] = currentOrigin
+        // Vary by origin because there are multiple origins
+        headers['Vary'] = 'Origin'
+      } else {
+        // There is no origin found in the headers, so we should return null
+        headers['Access-Control-Allow-Origin'] = 'null'
+      }
+    }
   }
 
   if (corsOptions.methods?.length) {
@@ -89,9 +115,17 @@ function getCORSResponseHeaders<TServerContext>(
     headers['Access-Control-Max-Age'] = corsOptions.maxAge.toString()
   }
 
-  headers['Server'] = 'GraphQL Yoga'
-
   return headers
+}
+
+async function getCORSResponseHeaders<TServerContext>(
+  request: Request,
+  serverContext: TServerContext,
+  corsOptionsFactory: CORSOptionsFactory<TServerContext>,
+) {
+  const corsOptions = await corsOptionsFactory(request, serverContext)
+
+  return getCORSHeadersByRequestAndOptions(request, corsOptions)
 }
 
 export function useCORS<TServerContext>(
@@ -106,12 +140,14 @@ export function useCORS<TServerContext>(
         ...options,
       }
       corsOptionsFactory = () => corsOptions
+    } else if (options === false) {
+      corsOptionsFactory = () => false
     }
   }
   return {
-    onRequest({ request, serverContext, endResponse }) {
+    async onRequest({ request, serverContext, endResponse }) {
       if (request.method.toUpperCase() === 'OPTIONS') {
-        const headers = getCORSResponseHeaders<any>(
+        const headers = await getCORSResponseHeaders<any>(
           request,
           serverContext,
           corsOptionsFactory,
@@ -123,8 +159,8 @@ export function useCORS<TServerContext>(
         return
       } else {
         return {
-          onRequestDone({ response }) {
-            const headers = getCORSResponseHeaders<any>(
+          async onRequestDone({ response }) {
+            const headers = await getCORSResponseHeaders<any>(
               request,
               serverContext,
               corsOptionsFactory,
